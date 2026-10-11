@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>할 일 목록</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --border: #e3e5e8;
+    --accent: #2563eb;
+    --accent-text: #ffffff;
+    --danger: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111315;
+      --card: #1b1e21;
+      --text: #e6e8ea;
+      --muted: #9aa1a9;
+      --border: #2c3035;
+      --accent: #3b82f6;
+      --accent-text: #ffffff;
+      --danger: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    padding: 48px 16px;
+  }
+  main {
+    max-width: 520px;
+    margin: 0 auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+  }
+  h1 { margin: 0 0 20px; font-size: 1.5rem; }
+  form { display: flex; gap: 8px; }
+  input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    font-size: 1rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button.add {
+    padding: 10px 16px;
+    font-size: 1rem;
+    color: var(--accent-text);
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  ul { list-style: none; margin: 20px 0 0; padding: 0; }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  li:last-child { border-bottom: none; }
+  li input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--accent); cursor: pointer; }
+  li label { flex: 1; overflow-wrap: anywhere; cursor: pointer; }
+  li.done label { text-decoration: line-through; color: var(--muted); }
+  button.remove {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    font-size: 1.1rem;
+    line-height: 1;
+    color: var(--muted);
+    background: none;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  button.remove:hover { color: var(--danger); background: var(--bg); }
+  .empty { margin: 20px 0 0; color: var(--muted); text-align: center; }
+  .count { margin: 16px 0 0; color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>할 일 목록</h1>
+  <form id="form">
+    <input id="input" type="text" placeholder="할 일을 입력하세요" autocomplete="off" aria-label="새 할 일">
+    <button class="add" type="submit">추가</button>
+  </form>
+  <ul id="list"></ul>
+  <p id="empty" class="empty">할 일이 없어요.</p>
+  <p id="count" class="count"></p>
+</main>
+<script>
+  const STORAGE_KEY = "todo-app.items";
+  const form = document.getElementById("form");
+  const input = document.getElementById("input");
+  const list = document.getElementById("list");
+  const empty = document.getElementById("empty");
+  const count = document.getElementById("count");
+
+  let items = load();
+
+  function load() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    } catch {}
+  }
+
+  function render() {
+    list.replaceChildren();
+    for (const item of items) {
+      const li = document.createElement("li");
+      li.className = item.done ? "done" : "";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.id = "item-" + item.id;
+      checkbox.checked = item.done;
+      checkbox.addEventListener("change", () => {
+        item.done = checkbox.checked;
+        save();
+        render();
+      });
+
+      const label = document.createElement("label");
+      label.htmlFor = checkbox.id;
+      label.textContent = item.text;
+
+      const remove = document.createElement("button");
+      remove.className = "remove";
+      remove.type = "button";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", "삭제: " + item.text);
+      remove.addEventListener("click", () => {
+        items = items.filter((i) => i.id !== item.id);
+        save();
+        render();
+      });
+
+      li.append(checkbox, label, remove);
+      list.append(li);
+    }
+    empty.hidden = items.length > 0;
+    const left = items.filter((i) => !i.done).length;
+    count.textContent = items.length ? "남은 할 일 " + left + "개" : "";
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    items.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, done: false, createdAt: new Date().toISOString() });
+    save();
+    render();
+    input.value = "";
+    input.focus();
+  });
+
+  render();
+</script>
+</body>
+</html>
